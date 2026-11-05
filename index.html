@@ -3,19 +3,20 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>Hardware Monitor - VRM, CPU, GPU & Telemetry</title>
+  <title>Hardware Monitor - VRM, Case, CPU, GPU & NVMe</title>
   <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/dseg@0.46.0/css/dseg.css">
   <style>
     :root {
       --bg-base: #090c10;
       --bg-panel: #131822;
-      --bg-panel-hover: #192130;
+      --bg-card-inner: #0d121c;
       --border-color: #212c40;
       --accent-cyan: #00d2ff;
       --accent-green: #00e676;
       --accent-orange: #ff9100;
       --accent-red: #ff1744;
       --accent-purple: #b388ff;
+      --accent-blue: #2979ff;
       --text-main: #f0f6fc;
       --text-muted: #8b949e;
       --font-mono: 'Consolas', 'Courier New', monospace;
@@ -30,28 +31,30 @@
     }
 
     body {
-      background: radial-gradient(circle at top right, #10192b, var(--bg-base) 85%);
+      background: radial-gradient(circle at top right, #111a2e, var(--bg-base) 80%);
       color: var(--text-main);
       font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif;
       min-height: 100vh;
       padding: 20px;
-      overflow-x: hidden;
     }
 
-    /* Верхняя статусная панель */
+    /* Шапка приложения */
     header {
       display: flex;
       justify-content: space-between;
       align-items: center;
-      padding-bottom: 16px;
+      padding-bottom: 14px;
       margin-bottom: 20px;
       border-bottom: 1px solid var(--border-color);
+      max-width: 1500px;
+      margin-left: auto;
+      margin-right: auto;
     }
 
     .title-group h1 {
-      font-size: 20px;
+      font-size: 19px;
       font-weight: 700;
-      letter-spacing: 1px;
+      letter-spacing: 0.8px;
       text-transform: uppercase;
       color: var(--accent-cyan);
       display: flex;
@@ -70,7 +73,7 @@
       font-weight: 600;
       padding: 4px 10px;
       border-radius: 20px;
-      background: rgba(255, 255, 255, 0.05);
+      background: rgba(255, 255, 255, 0.04);
       border: 1px solid var(--border-color);
       display: flex;
       align-items: center;
@@ -86,10 +89,25 @@
     .status-dot.online { background: var(--accent-green); box-shadow: 0 0 8px var(--accent-green); }
     .status-dot.warn { background: var(--accent-orange); box-shadow: 0 0 8px var(--accent-orange); }
 
-    /* Сетка дашборда */
-    .dashboard-grid {
+    /* ДВУХКОЛОНОЧНЫЙ МАКЕТ */
+    .dashboard-layout {
       display: grid;
-      grid-template-columns: repeat(12, 1fr);
+      grid-template-columns: 1fr 1fr;
+      gap: 20px;
+      max-width: 1500px;
+      margin: 0 auto;
+      align-items: start;
+    }
+
+    .column-arduino {
+      display: flex;
+      flex-direction: column;
+      gap: 20px;
+    }
+
+    .column-pc {
+      display: flex;
+      flex-direction: column;
       gap: 20px;
     }
 
@@ -97,8 +115,8 @@
       background: var(--bg-panel);
       border: 1px solid var(--border-color);
       border-radius: 12px;
-      padding: 18px;
-      box-shadow: 0 8px 24px rgba(0, 0, 0, 0.4);
+      padding: 20px;
+      box-shadow: 0 8px 24px rgba(0, 0, 0, 0.45);
       position: relative;
       overflow: hidden;
     }
@@ -109,21 +127,20 @@
       top: 0;
       left: 0;
       right: 0;
-      height: 2px;
-      background: transparent;
+      height: 3px;
     }
 
-    .card-vrm::before { background: linear-gradient(90deg, var(--accent-cyan), var(--accent-green)); }
-    .card-cpu::before { background: linear-gradient(90deg, #2979ff, #00d2ff); }
-    .card-gpu::before { background: linear-gradient(90deg, #76ff03, #00e676); }
+    .card-vrm::before { background: linear-gradient(90deg, var(--accent-orange), #ff5722); }
+    .card-case::before { background: linear-gradient(90deg, var(--accent-cyan), var(--accent-green)); }
+    .card-cpu::before { background: linear-gradient(90deg, var(--accent-blue), var(--accent-cyan)); }
+    .card-gpu::before { background: linear-gradient(90deg, var(--accent-green), #76ff03); }
     .card-nvme::before { background: linear-gradient(90deg, var(--accent-purple), var(--accent-cyan)); }
-    .card-ram::before { background: linear-gradient(90deg, #ffd600, var(--accent-orange)); }
 
     .card-header {
       display: flex;
       justify-content: space-between;
       align-items: center;
-      margin-bottom: 14px;
+      margin-bottom: 12px;
     }
 
     .card-title {
@@ -134,72 +151,68 @@
       color: var(--text-muted);
     }
 
-    /* Семисегментные дисплеи */
+    /* Семисегментные дисплеи температуры */
     .dseg-display {
       font-family: var(--font-dseg);
       font-size: 42px;
       line-height: 1;
       letter-spacing: 2px;
       color: var(--text-main);
-      text-shadow: 0 0 10px rgba(0, 210, 255, 0.2);
     }
 
     .unit {
       font-family: var(--font-mono);
       font-size: 18px;
       color: var(--text-muted);
-      margin-left: 4px;
+      margin-left: 6px;
     }
 
-    /* Шкалы прогресса */
-    .progress-bar-bg {
-      background: rgba(255, 255, 255, 0.08);
-      height: 8px;
-      border-radius: 4px;
-      overflow: hidden;
-      margin-top: 8px;
+    /* Блок кулера, стоящий РЯДОМ с температурой (шрифт ровно в 2 раза меньше: 21px) */
+    .fan-inline-value {
+      font-family: var(--font-mono);
+      font-weight: 700;
+      font-size: 21px; /* 42px / 2 = 21px */
+      line-height: 1;
+      letter-spacing: 0.5px;
+      margin-left: 14px;
+      display: flex;
+      align-items: baseline;
+      gap: 4px;
     }
 
-    .progress-bar-fill {
-      height: 100%;
-      width: 0%;
-      background: var(--accent-cyan);
-      transition: width 0.3s ease, background 0.3s ease;
-    }
-
-    /* Специфические стили карточки VRM & Arduino */
-    .vrm-dual-display {
-      display: grid;
-      grid-template-columns: 1fr 1fr;
-      gap: 16px;
-      margin-bottom: 16px;
-    }
-
-    .sensor-box {
-      background: rgba(0, 0, 0, 0.25);
-      border: 1px solid rgba(255, 255, 255, 0.04);
-      border-radius: 8px;
-      padding: 12px;
-    }
-
-    .sensor-label {
-      font-size: 11px;
-      text-transform: uppercase;
+    .fan-inline-unit {
+      font-size: 13px;
       color: var(--text-muted);
-      margin-bottom: 6px;
       font-weight: 600;
     }
 
-    /* Панель управления кулером VRM */
-    .fan-control-box {
-      background: rgba(0, 0, 0, 0.3);
-      border: 1px solid rgba(0, 210, 255, 0.15);
+    /* Полоса состояния на всю ширину блока (толщина 4px) */
+    .full-load-bar-bg {
+      background: rgba(255, 255, 255, 0.08);
+      height: 4px;
+      border-radius: 2px;
+      overflow: hidden;
+      width: 100%;
+      margin-top: 8px;
+      margin-bottom: 12px;
+    }
+
+    .full-load-bar-fill {
+      height: 100%;
+      width: 0%;
+      transition: width 0.3s ease;
+    }
+
+    /* Панели управления кулерами Arduino */
+    .control-box {
+      background: var(--bg-card-inner);
+      border: 1px solid rgba(255, 255, 255, 0.05);
       border-radius: 8px;
       padding: 14px;
       margin-top: 14px;
     }
 
-    .fan-mode-switch {
+    .mode-switch {
       display: flex;
       gap: 8px;
       margin-bottom: 12px;
@@ -208,7 +221,7 @@
     .btn-mode {
       flex: 1;
       padding: 6px 12px;
-      background: rgba(255, 255, 255, 0.06);
+      background: rgba(255, 255, 255, 0.05);
       border: 1px solid var(--border-color);
       color: var(--text-muted);
       border-radius: 6px;
@@ -239,7 +252,7 @@
     .fan-num-input {
       width: 55px;
       padding: 4px 6px;
-      background: #0d121c;
+      background: #090c10;
       border: 1px solid var(--border-color);
       border-radius: 4px;
       color: var(--text-main);
@@ -261,39 +274,61 @@
     }
     .btn-apply:hover { opacity: 0.85; }
 
-    /* Таблицы метрик (CPU, GPU, NVMe) */
+    /* Таблицы метрик */
     .metrics-table {
       width: 100%;
       border-collapse: collapse;
-      margin-top: 8px;
+      margin-top: 6px;
     }
 
     .metrics-table td {
-      padding: 6px 0;
+      padding: 5px 0;
       font-size: 13px;
       border-bottom: 1px solid rgba(255, 255, 255, 0.03);
     }
 
-    .metrics-table td:first-child {
-      color: var(--text-muted);
-    }
-
+    .metrics-table td:first-child { color: var(--text-muted); }
     .metrics-table td:last-child {
       text-align: right;
       font-family: var(--font-mono);
       font-weight: 600;
     }
 
-    /* Раскладка колонок */
-    .col-vrm { grid-column: span 6; }
-    .col-cpu { grid-column: span 6; }
-    .col-gpu { grid-column: span 6; }
-    .col-nvme { grid-column: span 3; }
-    .col-ram { grid-column: span 3; }
+    /* СТРОКА ЧАСТОТ ЯДЕР: строго одна строка, только частота в ГГц, без полосок и названий */
+    .cores-single-row {
+      display: flex;
+      gap: 6px;
+      align-items: center;
+      justify-content: space-between;
+      margin-top: 10px;
+      padding-top: 8px;
+      border-top: 1px solid rgba(255, 255, 255, 0.05);
+      overflow-x: auto;
+    }
 
-    @media (max-width: 1100px) {
-      .col-vrm, .col-cpu, .col-gpu { grid-column: span 12; }
-      .col-nvme, .col-ram { grid-column: span 6; }
+    .core-ghz-badge {
+      flex: 1;
+      background: var(--bg-card-inner);
+      border: 1px solid rgba(255, 255, 255, 0.05);
+      border-radius: 4px;
+      padding: 5px 6px;
+      text-align: center;
+      font-family: var(--font-mono);
+      font-size: 12px;
+      font-weight: 700;
+      color: var(--accent-cyan);
+      white-space: nowrap;
+    }
+
+    .core-ghz-unit {
+      font-size: 10px;
+      color: var(--text-muted);
+      font-weight: 400;
+      margin-left: 2px;
+    }
+
+    @media (max-width: 950px) {
+      .dashboard-layout { grid-template-columns: 1fr; }
     }
   </style>
 </head>
@@ -301,7 +336,7 @@
 
   <header>
     <div class="title-group">
-      <h1>⚡ Hardware Telemetry & VRM Control</h1>
+      <h1>⚡ Hardware Telemetry & Dual-Zone Control</h1>
     </div>
     <div class="badge-bar">
       <div class="status-badge" id="badge-arduino">
@@ -310,195 +345,231 @@
       </div>
       <div class="status-badge" id="badge-ohm">
         <span class="status-dot" id="dot-ohm"></span>
-        <span id="text-ohm">OHM: Опрос датчиков</span>
+        <span id="text-ohm">Служба OHM: Запуск</span>
       </div>
     </div>
   </header>
 
-  <main class="dashboard-grid">
+  <main class="dashboard-layout">
 
-    <!-- КАРТОЧКА 1: VRM И КОРПУС (ARDUINO) -->
-    <div class="card card-vrm col-vrm">
-      <div class="card-header">
-        <span class="card-title">Охлаждение VRM & Корпус (Arduino)</span>
-        <span class="sensor-label" id="arduino-port-label">COM-Port</span>
-      </div>
+    <!-- ЛЕВАЯ КОЛОНКА: БЛОКИ ARDUINO -->
+    <div class="column-arduino">
 
-      <div class="vrm-dual-display">
-        <!-- Датчик VRM -->
-        <div class="sensor-box">
-          <div class="sensor-label">Температура VRM (DS18B20)</div>
+      <!-- 1. ЗОНА VRM (СВЕРХУ) -->
+      <div class="card card-vrm">
+        <div class="card-header">
+          <span class="card-title">Зона VRM (Цепи питания)</span>
+          <span class="status-badge" style="font-size: 10px;" id="badge-vrm-state">DS18B20 #1</span>
+        </div>
+
+        <div style="display: flex; justify-content: space-between; align-items: baseline; margin-bottom: 8px;">
           <div class="dseg-display" style="color: var(--accent-orange);">
             <span id="val-vrm">--.-</span><span class="unit">°C</span>
           </div>
+          <div style="text-align: right;">
+            <div style="font-size: 10px; color: var(--text-muted); text-transform: uppercase;">Статус VRM</div>
+            <div id="vrm-status-text" style="font-weight: 700; color: var(--accent-green); font-size: 13px;">В норме</div>
+          </div>
         </div>
 
-        <!-- Датчик Корпуса (бывший AUX) -->
-        <div class="sensor-box">
-          <div class="sensor-label">Корпус ПК (Датчик воздуха)</div>
+        <div class="control-box">
+          <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 6px;">
+            <span style="font-size: 11px; text-transform: uppercase; color: var(--text-muted); font-weight: 600;">Кулер VRM (ШИМ)</span>
+            <span style="font-family: var(--font-mono); font-weight: 700; color: var(--accent-orange);" id="val-fan-vrm">0%</span>
+          </div>
+          <div class="full-load-bar-bg" style="margin-bottom: 8px;">
+            <div class="full-load-bar-fill" id="bar-fan-vrm" style="background: var(--accent-orange);"></div>
+          </div>
+
+          <div style="margin-top: 10px;">
+            <div class="mode-switch">
+              <button class="btn-mode active" id="btn-vrm-auto" onclick="switchVrmMode('auto')">АВТОМАТИЧЕСКИЙ</button>
+              <button class="btn-mode" id="btn-vrm-manual" onclick="switchVrmMode('manual')">РУЧНОЙ</button>
+            </div>
+
+            <div id="controls-vrm-auto" class="fan-input-group">
+              <span style="font-size: 12px; color: var(--text-muted);">Порог старта:</span>
+              <input type="number" id="input-vrm-start" class="fan-num-input" value="50" min="25" max="85" step="1">
+              <span style="font-size: 12px; color: var(--text-muted);">°C</span>
+              <button class="btn-apply" onclick="applyVrmAuto()">Задать</button>
+              <span style="font-size: 11px; color: var(--text-muted); margin-left: auto;">(100% при 100°C)</span>
+            </div>
+
+            <div id="controls-vrm-manual" class="fan-input-group" style="display: none;">
+              <span style="font-size: 12px; color: var(--text-muted);">Мощность:</span>
+              <input type="range" id="slider-vrm-val" class="fan-slider" min="0" max="100" value="50" oninput="document.getElementById('input-vrm-val').value = this.value">
+              <input type="number" id="input-vrm-val" class="fan-num-input" value="50" min="0" max="100" oninput="document.getElementById('slider-vrm-val').value = this.value">
+              <span style="font-size: 12px; color: var(--text-muted);">%</span>
+              <button class="btn-apply" onclick="applyVrmManual()">Применить</button>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <!-- 2. КОРПУС ПК (СТРОГО ПОД ЗОНОЙ VRM) -->
+      <div class="card card-case">
+        <div class="card-header">
+          <span class="card-title">Корпус ПК (Датчик воздуха)</span>
+          <span class="status-badge" style="font-size: 10px;" id="badge-case-state">DS18B20 #2</span>
+        </div>
+
+        <div style="display: flex; justify-content: space-between; align-items: baseline; margin-bottom: 8px;">
           <div class="dseg-display" style="color: var(--accent-cyan);">
             <span id="val-case">--.-</span><span class="unit">°C</span>
           </div>
+          <div style="text-align: right;">
+            <div style="font-size: 10px; color: var(--text-muted); text-transform: uppercase;">Микроклимат</div>
+            <div id="case-status-text" style="font-weight: 700; color: var(--accent-cyan); font-size: 13px;">Ожидание</div>
+          </div>
+        </div>
+
+        <div class="control-box">
+          <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 6px;">
+            <span style="font-size: 11px; text-transform: uppercase; color: var(--text-muted); font-weight: 600;">Вентиляция корпуса</span>
+            <span style="font-family: var(--font-mono); font-weight: 700; color: var(--accent-cyan);" id="val-fan-case">АВТО</span>
+          </div>
+          <div class="full-load-bar-bg" style="margin-bottom: 8px;">
+            <div class="full-load-bar-fill" id="bar-fan-case" style="background: var(--accent-cyan); width: 35%;"></div>
+          </div>
+
+          <div style="margin-top: 10px;">
+            <div class="mode-switch">
+              <button class="btn-mode active" id="btn-case-auto" onclick="switchCaseMode('auto')">АВТОМАТИЧЕСКИЙ</button>
+              <button class="btn-mode" id="btn-case-manual" onclick="switchCaseMode('manual')">РУЧНОЙ</button>
+            </div>
+
+            <div id="controls-case-auto" class="fan-input-group">
+              <span style="font-size: 12px; color: var(--text-muted);">Порог обдува:</span>
+              <input type="number" id="input-case-start" class="fan-num-input" value="35" min="20" max="60" step="1">
+              <span style="font-size: 12px; color: var(--text-muted);">°C</span>
+              <button class="btn-apply" onclick="applyCaseAuto()">Задать</button>
+              <span style="font-size: 11px; color: var(--text-muted); margin-left: auto;">(Целевая темп.)</span>
+            </div>
+
+            <div id="controls-case-manual" class="fan-input-group" style="display: none;">
+              <span style="font-size: 12px; color: var(--text-muted);">Мощность:</span>
+              <input type="range" id="slider-case-val" class="fan-slider" min="0" max="100" value="40" oninput="document.getElementById('input-case-val').value = this.value">
+              <input type="number" id="input-case-val" class="fan-num-input" value="40" min="0" max="100" oninput="document.getElementById('slider-case-val').value = this.value">
+              <span style="font-size: 12px; color: var(--text-muted);">%</span>
+              <button class="btn-apply" onclick="applyCaseManual()">Применить</button>
+            </div>
+          </div>
         </div>
       </div>
 
-      <!-- Вентилятор VRM и управление -->
-      <div class="fan-control-box">
-        <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 6px;">
-          <span class="sensor-label" style="margin: 0;">Кулер VRM (ШИМ Мосфет)</span>
-          <span style="font-family: var(--font-mono); font-weight: 700; color: var(--accent-green);" id="val-fan-percent">0%</span>
-        </div>
-        <div class="progress-bar-bg">
-          <div class="progress-bar-fill" id="bar-fan-percent" style="background: var(--accent-green);"></div>
-        </div>
-
-        <!-- Переключатель режима АВТО / РУЧНОЙ -->
-        <div style="margin-top: 14px;">
-          <div class="fan-mode-switch">
-            <button class="btn-mode active" id="btn-mode-auto" onclick="switchFanMode('auto')">АВТОМАТИЧЕСКИЙ РЕЖИМ</button>
-            <button class="btn-mode" id="btn-mode-manual" onclick="switchFanMode('manual')">РУЧНОЙ РЕЖИМ</button>
-          </div>
-
-          <!-- Блок настроек АВТО -->
-          <div id="controls-auto" class="fan-input-group">
-            <span style="font-size: 12px; color: var(--text-muted);">Порог старта кулера:</span>
-            <input type="number" id="input-start-temp" class="fan-num-input" value="50" min="25" max="85" step="1">
-            <span style="font-size: 12px; color: var(--text-muted);">°C</span>
-            <button class="btn-apply" onclick="applyAutoSettings()">Задать порог</button>
-            <span style="font-size: 11px; color: var(--text-muted); margin-left: auto;">(100% при 100°C)</span>
-          </div>
-
-          <!-- Блок настроек РУЧНОЙ -->
-          <div id="controls-manual" class="fan-input-group" style="display: none;">
-            <span style="font-size: 12px; color: var(--text-muted);">Обороты:</span>
-            <input type="range" id="slider-manual-percent" class="fan-slider" min="0" max="100" value="50" oninput="document.getElementById('input-manual-val').value = this.value">
-            <input type="number" id="input-manual-val" class="fan-num-input" value="50" min="0" max="100" oninput="document.getElementById('slider-manual-percent').value = this.value">
-            <span style="font-size: 12px; color: var(--text-muted);">%</span>
-            <button class="btn-apply" onclick="applyManualSettings()">Применить</button>
-          </div>
-        </div>
-      </div>
     </div>
 
-    <!-- КАРТОЧКА 2: ПРОЦЕССОР (CPU) -->
-    <div class="card card-cpu col-cpu">
-      <div class="card-header">
-        <span class="card-title">Процессор (CPU)</span>
-        <span id="cpu-brand" style="font-size: 12px; color: var(--text-muted); font-weight: 600;">Загрузка...</span>
-      </div>
+    <!-- ПРАВАЯ КОЛОНКА: СИСТЕМНЫЕ БЛОКИ ДРУГ ПОД ДРУГОМ -->
+    <div class="column-pc">
 
-      <div style="display: flex; gap: 20px; align-items: baseline; margin-bottom: 12px;">
-        <div class="dseg-display" style="color: #2979ff;">
-          <span id="val-cpu-temp">--</span><span class="unit">°C</span>
+      <!-- 1. ПРОЦЕССОР (CPU) -->
+      <div class="card card-cpu">
+        <div class="card-header">
+          <span class="card-title">Процессор (CPU)</span>
+          <span id="cpu-brand" style="font-size: 12px; color: var(--text-muted); font-weight: 600;">Опрос...</span>
         </div>
-        <div style="flex: 1;">
-          <div style="display: flex; justify-content: space-between; font-size: 12px; color: var(--text-muted);">
-            <span>Загрузка ядер</span>
-            <span id="val-cpu-load" style="font-family: var(--font-mono); font-weight: 700; color: var(--text-main);">0%</span>
+
+        <!-- ТЕМПЕРАТУРА И КУЛЕР CPU РЯДОМ НА ОДНОЙ СТРОКЕ (КУЛЕР В 2 РАЗА МЕНЬШЕ) -->
+        <div style="display: flex; align-items: baseline;">
+          <div class="dseg-display" style="color: var(--accent-blue);">
+            <span id="val-cpu-temp">--</span><span class="unit">°C</span>
           </div>
-          <div class="progress-bar-bg">
-            <div class="progress-bar-fill" id="bar-cpu-load" style="background: #2979ff;"></div>
+          <div class="fan-inline-value" style="color: var(--accent-cyan);">
+            <span id="val-cpu-fan-inline">--</span>
+            <span class="fan-inline-unit" id="unit-cpu-fan-inline">RPM</span>
           </div>
         </div>
-      </div>
 
-      <table class="metrics-table">
-        <tr>
-          <td>Напряжение ядра (Vcore)</td>
-          <td id="val-cpu-volt">-- V</td>
-        </tr>
-        <tr>
-          <td>Энергопотребление (Package Power)</td>
-          <td id="val-cpu-power">-- W</td>
-        </tr>
-        <tr>
-          <td>Частота основного ядра</td>
-          <td id="val-cpu-clock">-- MHz</td>
-        </tr>
-      </table>
-    </div>
-
-    <!-- КАРТОЧКА 3: ВИДЕОКАРТА (GPU) — ПОД ПРОЦЕССОРОМ, БЕЗ ЧАСТОТ! -->
-    <div class="card card-gpu col-gpu">
-      <div class="card-header">
-        <span class="card-title">Видеокарта (GPU)</span>
-        <span id="gpu-name" style="font-size: 12px; color: var(--text-muted); font-weight: 600;">Графический процессор</span>
-      </div>
-
-      <div style="display: flex; gap: 20px; align-items: baseline; margin-bottom: 12px;">
-        <div class="dseg-display" style="color: var(--accent-green);">
-          <span id="val-gpu-temp">--</span><span class="unit">°C</span>
+        <!-- Тонкая полоса состояния во всю ширину блока (4px) -->
+        <div class="full-load-bar-bg">
+          <div class="full-load-bar-fill" id="bar-cpu-total-load" style="background: var(--accent-blue);"></div>
         </div>
-        <div style="flex: 1;">
-          <div style="display: flex; justify-content: space-between; font-size: 12px; color: var(--text-muted);">
-            <span>Загрузка чипа (GPU Core Load)</span>
-            <span id="val-gpu-load" style="font-family: var(--font-mono); font-weight: 700; color: var(--text-main);">0%</span>
-          </div>
-          <div class="progress-bar-bg">
-            <div class="progress-bar-fill" id="bar-gpu-load" style="background: var(--accent-green);"></div>
-          </div>
+
+        <table class="metrics-table">
+          <tr>
+            <td>Напряжение ядра (Vcore)</td>
+            <td id="val-cpu-volt">-- V</td>
+          </tr>
+          <tr>
+            <td>Потребляемая мощность (Package Power)</td>
+            <td id="val-cpu-power">-- W</td>
+          </tr>
+          <tr>
+            <td>Базовая частота (Clock)</td>
+            <td id="val-cpu-clock">-- MHz</td>
+          </tr>
+        </table>
+
+        <!-- СТРОКА ЧАСТОТ ЯДЕР: строго одна строка, только частота в ГГц, без названий и полосок -->
+        <div class="cores-single-row" id="cpu-cores-list">
+          <!-- Заполняется частотами в ГГц -->
         </div>
       </div>
 
-      <table class="metrics-table">
-        <tr>
-          <td>Температура Hot Spot</td>
-          <td id="val-gpu-hotspot">-- °C</td>
-        </tr>
-        <tr>
-          <td>Кулер видеокарты (Fan Speed)</td>
-          <td id="val-gpu-fan">-- %</td>
-        </tr>
-        <tr>
-          <td>Энергопотребление GPU</td>
-          <td id="val-gpu-power">-- W</td>
-        </tr>
-      </table>
-    </div>
-
-    <!-- КАРТОЧКА 4: НАКОПИТЕЛЬ (NVME SSD) -->
-    <div class="card card-nvme col-nvme">
-      <div class="card-header">
-        <span class="card-title">Накопитель (NVMe)</span>
-      </div>
-      <div id="nvme-container">
-        <div class="dseg-display" style="color: var(--accent-purple); font-size: 34px;">
-          <span id="val-nvme-temp">--</span><span class="unit">°C</span>
+      <!-- 2. ВИДЕОКАРТА (GPU) -->
+      <div class="card card-gpu">
+        <div class="card-header">
+          <span class="card-title">Видеокарта (GPU)</span>
+          <span id="gpu-name" style="font-size: 12px; color: var(--text-muted); font-weight: 600;">Видеоадаптер</span>
         </div>
-        <div style="margin-top: 10px; font-size: 12px; color: var(--text-muted);" id="nvme-drive-name">SSD Накопитель</div>
-        <div style="margin-top: 12px;">
-          <div style="display: flex; justify-content: space-between; font-size: 11px; color: var(--text-muted);">
-            <span>Диск C:</span>
-            <span id="val-nvme-space" style="font-family: var(--font-mono);">-- / -- GB</span>
+
+        <!-- ТЕМПЕРАТУРА И КУЛЕР GPU РЯДОМ НА ОДНОЙ СТРОКЕ (КУЛЕР В 2 РАЗА МЕНЬШЕ) -->
+        <div style="display: flex; align-items: baseline;">
+          <div class="dseg-display" style="color: var(--accent-green);">
+            <span id="val-gpu-temp">--</span><span class="unit">°C</span>
           </div>
-          <div class="progress-bar-bg">
-            <div class="progress-bar-fill" id="bar-nvme-space" style="background: var(--accent-purple);"></div>
+          <div class="fan-inline-value" style="color: var(--accent-green);">
+            <span id="val-gpu-fan-inline">--</span>
+            <span class="fan-inline-unit" id="unit-gpu-fan-inline">%</span>
           </div>
         </div>
-      </div>
-    </div>
 
-    <!-- КАРТОЧКА 5: ОПЕРАТИВНАЯ ПАМЯТЬ (RAM) -->
-    <div class="card card-ram col-ram">
-      <div class="card-header">
-        <span class="card-title">Память (RAM)</span>
+        <!-- Тонкая полоса состояния во всю ширину блока (4px) -->
+        <div class="full-load-bar-bg">
+          <div class="full-load-bar-fill" id="bar-gpu-load" style="background: var(--accent-green);"></div>
+        </div>
+
+        <table class="metrics-table">
+          <tr>
+            <td>Температура Hot Spot</td>
+            <td id="val-gpu-hotspot">-- °C</td>
+          </tr>
+          <tr>
+            <td>Энергопотребление GPU Power</td>
+            <td id="val-gpu-power">-- W</td>
+          </tr>
+        </table>
       </div>
-      <div class="dseg-display" style="color: #ffd600; font-size: 34px;">
-        <span id="val-ram-percent">--</span><span class="unit">%</span>
+
+      <!-- 3. НАКОПИТЕЛЬ NVME -->
+      <div class="card card-nvme">
+        <div class="card-header">
+          <span class="card-title">Накопитель NVMe SSD</span>
+          <span id="nvme-drive-name" style="font-size: 12px; color: var(--text-muted); font-weight: 600;">Поиск...</span>
+        </div>
+
+        <div style="display: flex; justify-content: space-between; align-items: baseline;">
+          <div class="dseg-display" style="color: var(--accent-purple);">
+            <span id="val-nvme-temp">--</span><span class="unit">°C</span>
+          </div>
+          <div style="text-align: right; font-family: var(--font-mono); font-size: 12px; color: var(--text-muted);" id="val-nvme-space">
+            -- / -- GB
+          </div>
+        </div>
+
+        <!-- Тонкая полоса состояния во всю ширину блока (4px) -->
+        <div class="full-load-bar-bg">
+          <div class="full-load-bar-fill" id="bar-nvme-space" style="background: var(--accent-purple);"></div>
+        </div>
       </div>
-      <div style="margin-top: 10px; font-size: 12px; color: var(--text-muted);">
-        Занято: <span id="val-ram-used" style="font-family: var(--font-mono); color: var(--text-main);">0</span> / <span id="val-ram-total" style="font-family: var(--font-mono);">0</span> GB
-      </div>
-      <div class="progress-bar-bg" style="margin-top: 16px;">
-        <div class="progress-bar-fill" id="bar-ram-used" style="background: #ffd600;"></div>
-      </div>
+
     </div>
 
   </main>
 
   <script>
     // ==========================================
-    // 1. WEB SERIAL API ДЛЯ СВЯЗИ С ARDUINO
+    // 1. СВЯЗЬ С ARDUINO (WEB SERIAL API)
     // ==========================================
     let serialPort = null;
     let serialWriter = null;
@@ -506,24 +577,21 @@
 
     async function initArduinoWebSerial() {
       if (!('serial' in navigator)) {
-        updateArduinoStatus(false, 'Web Serial недоступен');
+        updateArduinoBadge(false, 'Web Serial недоступен');
         return;
       }
 
       try {
-        // В Electron 33 событие 'select-serial-port' в main.js автоматически выбирает порт Arduino
         serialPort = await navigator.serial.requestPort();
         await serialPort.open({ baudRate: 9600 });
 
         isConnectedArduino = true;
-        updateArduinoStatus(true, 'Arduino: Онлайн (9600)');
+        updateArduinoBadge(true, 'Arduino: Онлайн (9600)');
 
-        // Канал отправки команд (AUTO:XX / MANUAL:YY)
         const textEncoder = new TextEncoderStream();
         textEncoder.readable.pipeTo(serialPort.writable);
         serialWriter = textEncoder.writable.getWriter();
 
-        // Канал приема телеметрии
         const textDecoder = new TextDecoderStream();
         serialPort.readable.pipeTo(textDecoder.writable);
         const reader = textDecoder.readable.getReader();
@@ -535,7 +603,7 @@
 
           buffer += value;
           const lines = buffer.split('\r\n');
-          buffer = lines.pop(); // Оставляем незавершенный кусок
+          buffer = lines.pop();
 
           for (const line of lines) {
             if (line.trim().length > 0) {
@@ -545,12 +613,11 @@
         }
       } catch (err) {
         isConnectedArduino = false;
-        updateArduinoStatus(false, 'Arduino: Ожидание подключения');
-        setTimeout(initArduinoWebSerial, 3000); // Повтор через 3 секунды
+        updateArduinoBadge(false, 'Arduino: Ожидание подключения');
+        setTimeout(initArduinoWebSerial, 3000);
       }
     }
 
-    // Разбор строки: "VRM:52.4,AUX:27.8,VRMFAN:45,START_TEMP:50.0"
     function parseArduinoPacket(line) {
       const data = {};
       line.split(',').forEach(item => {
@@ -558,47 +625,72 @@
         if (k && v !== undefined) data[k.trim()] = parseFloat(v.trim());
       });
 
-      // 1. Температура VRM
+      // 1. VRM
       if (!isNaN(data.VRM)) {
         const vrmEl = document.getElementById('val-vrm');
+        const vrmStatus = document.getElementById('vrm-status-text');
         if (data.VRM === -127.0) {
           vrmEl.textContent = 'ОШИБ';
-          vrmEl.style.color = 'var(--accent-red)';
+          vrmStatus.textContent = 'Обрыв датчика';
+          vrmStatus.style.color = 'var(--accent-red)';
         } else {
           vrmEl.textContent = data.VRM.toFixed(1);
-          vrmEl.style.color = data.VRM > 85 ? 'var(--accent-red)' : (data.VRM > 70 ? 'var(--accent-orange)' : 'var(--accent-cyan)');
+          if (data.VRM > 85) {
+            vrmStatus.textContent = 'Критический нагрев';
+            vrmStatus.style.color = 'var(--accent-red)';
+            vrmEl.style.color = 'var(--accent-red)';
+          } else if (data.VRM > 70) {
+            vrmStatus.textContent = 'Повышенный нагрев';
+            vrmStatus.style.color = 'var(--accent-orange)';
+            vrmEl.style.color = 'var(--accent-orange)';
+          } else {
+            vrmStatus.textContent = 'В норме';
+            vrmStatus.style.color = 'var(--accent-green)';
+            vrmEl.style.color = 'var(--accent-orange)';
+          }
         }
       }
 
-      // 2. Температура Корпуса (бывший AUX)
+      // 2. Корпус
       if (!isNaN(data.AUX)) {
         const caseEl = document.getElementById('val-case');
+        const caseStatus = document.getElementById('case-status-text');
         if (data.AUX <= -90.0) {
-          caseEl.textContent = 'ОТКЛ'; // Датчик не подключен
-          caseEl.style.color = 'var(--text-muted)';
+          caseEl.textContent = 'ОТКЛ';
+          caseStatus.textContent = 'Не подключен';
+          caseStatus.style.color = 'var(--text-muted)';
         } else {
           caseEl.textContent = data.AUX.toFixed(1);
-          caseEl.style.color = 'var(--accent-cyan)';
+          if (data.AUX > 42) {
+            caseStatus.textContent = 'Горячий корпус';
+            caseStatus.style.color = 'var(--accent-red)';
+          } else if (data.AUX > 36) {
+            caseStatus.textContent = 'Теплый воздух';
+            caseStatus.style.color = 'var(--accent-orange)';
+          } else {
+            caseStatus.textContent = 'Оптимально';
+            caseStatus.style.color = 'var(--accent-green)';
+          }
         }
       }
 
-      // 3. Обороты кулера VRM
+      // 3. Кулер VRM
       if (!isNaN(data.VRMFAN)) {
-        const pct = Math.round(data.VRMFAN);
-        document.getElementById('val-fan-percent').textContent = pct + '%';
-        document.getElementById('bar-fan-percent').style.width = pct + '%';
+        const fanPct = Math.round(data.VRMFAN);
+        document.getElementById('val-fan-vrm').textContent = fanPct + '%';
+        document.getElementById('bar-fan-vrm').style.width = fanPct + '%';
       }
 
-      // 4. Порог старта (если пришел от Arduino)
+      // 4. Порог старта
       if (!isNaN(data.START_TEMP)) {
-        const inputStart = document.getElementById('input-start-temp');
+        const inputStart = document.getElementById('input-vrm-start');
         if (document.activeElement !== inputStart) {
           inputStart.value = Math.round(data.START_TEMP);
         }
       }
     }
 
-    function updateArduinoStatus(online, text) {
+    function updateArduinoBadge(online, text) {
       const dot = document.getElementById('dot-arduino');
       const label = document.getElementById('text-arduino');
       if (dot && label) {
@@ -607,23 +699,21 @@
       }
     }
 
-    // Отправка команд в Arduino
     async function sendSerial(cmd) {
       if (serialWriter && isConnectedArduino) {
         try {
           await serialWriter.write(cmd + '\n');
         } catch (e) {
-          console.error('Ошибка отправки:', e);
+          console.error('[Serial] Ошибка отправки:', e);
         }
       }
     }
 
-    // Управление режимами обдува
-    function switchFanMode(mode) {
-      const btnAuto = document.getElementById('btn-mode-auto');
-      const btnManual = document.getElementById('btn-mode-manual');
-      const boxAuto = document.getElementById('controls-auto');
-      const boxManual = document.getElementById('controls-manual');
+    function switchVrmMode(mode) {
+      const btnAuto = document.getElementById('btn-vrm-auto');
+      const btnManual = document.getElementById('btn-vrm-manual');
+      const boxAuto = document.getElementById('controls-vrm-auto');
+      const boxManual = document.getElementById('controls-vrm-manual');
 
       if (mode === 'auto') {
         btnAuto.classList.add('active');
@@ -638,28 +728,56 @@
       }
     }
 
-    function applyAutoSettings() {
-      const val = parseFloat(document.getElementById('input-start-temp').value);
-      if (!isNaN(val)) {
-        sendSerial(`AUTO:${val}`);
+    function applyVrmAuto() {
+      const val = parseFloat(document.getElementById('input-vrm-start').value);
+      if (!isNaN(val)) sendSerial(`AUTO:${val}`);
+    }
+
+    function applyVrmManual() {
+      const val = parseInt(document.getElementById('input-vrm-val').value, 10);
+      if (!isNaN(val)) sendSerial(`MANUAL:${val}`);
+    }
+
+    function switchCaseMode(mode) {
+      const btnAuto = document.getElementById('btn-case-auto');
+      const btnManual = document.getElementById('btn-case-manual');
+      const boxAuto = document.getElementById('controls-case-auto');
+      const boxManual = document.getElementById('controls-case-manual');
+
+      if (mode === 'auto') {
+        btnAuto.classList.add('active');
+        btnManual.classList.remove('active');
+        boxAuto.style.display = 'flex';
+        boxManual.style.display = 'none';
+      } else {
+        btnManual.classList.add('active');
+        btnAuto.classList.remove('active');
+        boxAuto.style.display = 'none';
+        boxManual.style.display = 'flex';
       }
     }
 
-    function applyManualSettings() {
-      const val = parseInt(document.getElementById('input-manual-val').value, 10);
+    function applyCaseAuto() {
+      const val = parseFloat(document.getElementById('input-case-start').value);
+      if (!isNaN(val)) sendSerial(`CASE_AUTO:${val}`);
+    }
+
+    function applyCaseManual() {
+      const val = parseInt(document.getElementById('input-case-val').value, 10);
       if (!isNaN(val)) {
-        sendSerial(`MANUAL:${val}`);
+        document.getElementById('val-fan-case').textContent = val + '%';
+        document.getElementById('bar-fan-case').style.width = val + '%';
+        sendSerial(`CASE_MANUAL:${val}`);
       }
     }
 
     // ==========================================
-    // 2. СИСТЕМНАЯ ТЕЛЕМЕТРИЯ (CPU, GPU, NVMe, RAM)
+    // 2. СИСТЕМНАЯ ТЕЛЕМЕТРИЯ (CPU, GPU, NVME)
     // ==========================================
     if (window.electronAPI && window.electronAPI.onCpuData) {
       window.electronAPI.onCpuData((data) => {
         if (!data) return;
 
-        // Статус OHM
         const dotOhm = document.getElementById('dot-ohm');
         const textOhm = document.getElementById('text-ohm');
         if (data.ohmOnline) {
@@ -676,11 +794,23 @@
           if (data.cpu.packageTemp !== null) {
             document.getElementById('val-cpu-temp').textContent = Math.round(data.cpu.packageTemp);
           }
-          if (data.cpu.load !== null) {
-            const load = Math.round(data.cpu.load);
-            document.getElementById('val-cpu-load').textContent = load + '%';
-            document.getElementById('bar-cpu-load').style.width = load + '%';
+
+          // Значение кулера CPU рядом с температурой (шрифт 21px)
+          const cpuFanEl = document.getElementById('val-cpu-fan-inline');
+          const cpuFanUnitEl = document.getElementById('unit-cpu-fan-inline');
+          if (data.cpu.fanSpeed !== null && data.cpu.fanSpeed !== undefined) {
+            cpuFanEl.textContent = data.cpu.fanSpeed;
+            cpuFanUnitEl.textContent = data.cpu.fanUnit || 'RPM';
+          } else {
+            cpuFanEl.textContent = 'АВТО';
+            cpuFanUnitEl.textContent = '';
           }
+
+          // Полоса состояния CPU
+          if (data.cpu.totalLoad !== null) {
+            document.getElementById('bar-cpu-total-load').style.width = Math.round(data.cpu.totalLoad) + '%';
+          }
+
           if (data.cpu.voltage !== null) {
             document.getElementById('val-cpu-volt').textContent = data.cpu.voltage.toFixed(3) + ' V';
           }
@@ -690,27 +820,64 @@
           if (data.cpu.clocks && data.cpu.clocks.length > 0) {
             document.getElementById('val-cpu-clock').textContent = Math.round(data.cpu.clocks[0].value) + ' MHz';
           }
+
+          // Отрисовка ЧАСТОТ ЯДЕР: строго одна строка, только ГГц, без названий и полос
+          if (data.cpu.coreClocks && data.cpu.coreClocks.length > 0) {
+            const coresContainer = document.getElementById('cpu-cores-list');
+            if (coresContainer.children.length !== data.cpu.coreClocks.length) {
+              coresContainer.innerHTML = '';
+              data.cpu.coreClocks.forEach((core, idx) => {
+                const ghz = (core.clock / 1000).toFixed(2);
+                const badge = document.createElement('div');
+                badge.className = 'core-ghz-badge';
+                badge.id = `core-ghz-${idx}`;
+                badge.innerHTML = `<span>${ghz}</span><span class="core-ghz-unit">GHz</span>`;
+                coresContainer.appendChild(badge);
+              });
+            } else {
+              data.cpu.coreClocks.forEach((core, idx) => {
+                const ghz = (core.clock / 1000).toFixed(2);
+                const el = document.getElementById(`core-ghz-${idx}`);
+                if (el) el.innerHTML = `<span>${ghz}</span><span class="core-ghz-unit">GHz</span>`;
+              });
+            }
+          }
         }
 
-        // --- Блок GPU (без частот!) ---
+        // --- Блок GPU ---
         if (data.gpu) {
           if (data.gpu.name) document.getElementById('gpu-name').textContent = data.gpu.name;
           if (data.gpu.coreTemp !== null) {
             document.getElementById('val-gpu-temp').textContent = Math.round(data.gpu.coreTemp);
           }
-          if (data.gpu.load !== null) {
-            const gLoad = Math.round(data.gpu.load);
-            document.getElementById('val-gpu-load').textContent = gLoad + '%';
-            document.getElementById('bar-gpu-load').style.width = gLoad + '%';
-          }
-          if (data.gpu.hotspotTemp !== null) {
-            document.getElementById('val-gpu-hotspot').textContent = Math.round(data.gpu.hotspotTemp) + ' °C';
+
+          // Значение кулера GPU рядом с температурой (шрифт 21px)
+          const gpuFanEl = document.getElementById('val-gpu-fan-inline');
+          const gpuFanUnitEl = document.getElementById('unit-gpu-fan-inline');
+          if (data.gpu.fanPercent !== null && data.gpu.fanPercent !== undefined) {
+            gpuFanEl.textContent = data.gpu.fanPercent;
+            gpuFanUnitEl.textContent = data.gpu.fanUnit || '%';
           } else {
-            document.getElementById('val-gpu-hotspot').textContent = '-- °C';
+            gpuFanEl.textContent = 'АВТО';
+            gpuFanUnitEl.textContent = '';
           }
-          if (data.gpu.fanPercent !== null) {
-            document.getElementById('val-gpu-fan').textContent = Math.round(data.gpu.fanPercent) + ' %';
+
+          // Полоса состояния GPU
+          if (data.gpu.load !== null) {
+            document.getElementById('bar-gpu-load').style.width = Math.round(data.gpu.load) + '%';
           }
+
+          // Hot Spot
+          const hotspotEl = document.getElementById('val-gpu-hotspot');
+          if (data.gpu.hotspotTemp !== null && data.gpu.hotspotTemp !== undefined) {
+            const hs = Math.round(data.gpu.hotspotTemp);
+            hotspotEl.textContent = hs + ' °C';
+            hotspotEl.style.color = hs > 88 ? 'var(--accent-red)' : (hs > 75 ? 'var(--accent-orange)' : 'var(--text-main)');
+          } else {
+            hotspotEl.textContent = 'Н/Д (Датчик не найден)';
+            hotspotEl.style.color = 'var(--text-muted)';
+          }
+
           if (data.gpu.power !== null) {
             document.getElementById('val-gpu-power').textContent = Math.round(data.gpu.power) + ' W';
           }
@@ -719,10 +886,10 @@
         // --- Блок NVMe ---
         if (data.nvme) {
           if (data.nvme.disks && data.nvme.disks.length > 0) {
-            const mainDisk = data.nvme.disks[0];
-            document.getElementById('nvme-drive-name').textContent = mainDisk.name;
-            if (mainDisk.temp !== null) {
-              document.getElementById('val-nvme-temp').textContent = Math.round(mainDisk.temp);
+            const disk = data.nvme.disks[0];
+            document.getElementById('nvme-drive-name').textContent = disk.name;
+            if (disk.temp !== null && disk.temp !== undefined) {
+              document.getElementById('val-nvme-temp').textContent = Math.round(disk.temp);
             }
           }
           if (data.nvme.primaryFs) {
@@ -731,18 +898,9 @@
             document.getElementById('bar-nvme-space').style.width = fs.usePercent + '%';
           }
         }
-
-        // --- Блок RAM ---
-        if (data.ram) {
-          document.getElementById('val-ram-percent').textContent = data.ram.usedPercent;
-          document.getElementById('val-ram-used').textContent = data.ram.usedGb;
-          document.getElementById('val-ram-total').textContent = data.ram.totalGb;
-          document.getElementById('bar-ram-used').style.width = data.ram.usedPercent + '%';
-        }
       });
     }
 
-    // Инициализация Web Serial при старте
     window.addEventListener('DOMContentLoaded', () => {
       initArduinoWebSerial();
     });
