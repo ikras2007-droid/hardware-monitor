@@ -3,6 +3,8 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <!-- Строгая политика безопасности (Content Security Policy) -->
+  <meta http-equiv="Content-Security-Policy" content="default-src 'self'; style-src 'self' 'unsafe-inline' https://cdn.jsdelivr.net; font-src 'self' https://cdn.jsdelivr.net data:; connect-src 'self' http://localhost:8085;">
   <title>Hardware Monitor - VRM, Case, CPU, GPU & NVMe</title>
   <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/dseg@0.46.0/css/dseg.css">
   <style>
@@ -38,7 +40,6 @@
       padding: 20px;
     }
 
-    /* Шапка приложения */
     header {
       display: flex;
       justify-content: space-between;
@@ -151,7 +152,6 @@
       color: var(--text-muted);
     }
 
-    /* Семисегментные дисплеи температуры */
     .dseg-display {
       font-family: var(--font-dseg);
       font-size: 42px;
@@ -167,11 +167,11 @@
       margin-left: 6px;
     }
 
-    /* Блок кулера, стоящий РЯДОМ с температурой (шрифт ровно в 2 раза меньше: 21px) */
+    /* Блок кулера РЯДОМ с температурой (размер шрифта 21px, ровно в 2 раза меньше 42px) */
     .fan-inline-value {
       font-family: var(--font-mono);
       font-weight: 700;
-      font-size: 21px; /* 42px / 2 = 21px */
+      font-size: 21px;
       line-height: 1;
       letter-spacing: 0.5px;
       margin-left: 14px;
@@ -294,7 +294,7 @@
       font-weight: 600;
     }
 
-    /* СТРОКА ЧАСТОТ ЯДЕР: строго одна строка, только частота в ГГц, без полосок и названий */
+    /* СТРОКА ЧАСТОТ ЯДЕР: строго одна строка, только частота в ГГц, без названий и полос */
     .cores-single-row {
       display: flex;
       gap: 6px;
@@ -469,7 +469,6 @@
           <span id="cpu-brand" style="font-size: 12px; color: var(--text-muted); font-weight: 600;">Опрос...</span>
         </div>
 
-        <!-- ТЕМПЕРАТУРА И КУЛЕР CPU РЯДОМ НА ОДНОЙ СТРОКЕ (КУЛЕР В 2 РАЗА МЕНЬШЕ) -->
         <div style="display: flex; align-items: baseline;">
           <div class="dseg-display" style="color: var(--accent-blue);">
             <span id="val-cpu-temp">--</span><span class="unit">°C</span>
@@ -480,7 +479,6 @@
           </div>
         </div>
 
-        <!-- Тонкая полоса состояния во всю ширину блока (4px) -->
         <div class="full-load-bar-bg">
           <div class="full-load-bar-fill" id="bar-cpu-total-load" style="background: var(--accent-blue);"></div>
         </div>
@@ -500,9 +498,8 @@
           </tr>
         </table>
 
-        <!-- СТРОКА ЧАСТОТ ЯДЕР: строго одна строка, только частота в ГГц, без названий и полосок -->
+        <!-- СТРОКА ЧАСТОТ ЯДЕР (ТОЛЬКО ГГЦ, БЕЗ НАЗВАНИЙ И ПОЛОС) -->
         <div class="cores-single-row" id="cpu-cores-list">
-          <!-- Заполняется частотами в ГГц -->
         </div>
       </div>
 
@@ -513,7 +510,6 @@
           <span id="gpu-name" style="font-size: 12px; color: var(--text-muted); font-weight: 600;">Видеоадаптер</span>
         </div>
 
-        <!-- ТЕМПЕРАТУРА И КУЛЕР GPU РЯДОМ НА ОДНОЙ СТРОКЕ (КУЛЕР В 2 РАЗА МЕНЬШЕ) -->
         <div style="display: flex; align-items: baseline;">
           <div class="dseg-display" style="color: var(--accent-green);">
             <span id="val-gpu-temp">--</span><span class="unit">°C</span>
@@ -524,7 +520,6 @@
           </div>
         </div>
 
-        <!-- Тонкая полоса состояния во всю ширину блока (4px) -->
         <div class="full-load-bar-bg">
           <div class="full-load-bar-fill" id="bar-gpu-load" style="background: var(--accent-green);"></div>
         </div>
@@ -557,7 +552,6 @@
           </div>
         </div>
 
-        <!-- Тонкая полоса состояния во всю ширину блока (4px) -->
         <div class="full-load-bar-bg">
           <div class="full-load-bar-fill" id="bar-nvme-space" style="background: var(--accent-purple);"></div>
         </div>
@@ -569,7 +563,7 @@
 
   <script>
     // ==========================================
-    // 1. СВЯЗЬ С ARDUINO (WEB SERIAL API)
+    // 1. СВЯЗЬ С ARDUINO (WEB SERIAL API С ВАЛИДАЦИЕЙ)
     // ==========================================
     let serialPort = null;
     let serialWriter = null;
@@ -618,22 +612,26 @@
       }
     }
 
+    // Разбор и валидация входящих данных: VRM:52.4,AUX:28.1,VRMFAN:45,START_TEMP:50.0
     function parseArduinoPacket(line) {
       const data = {};
       line.split(',').forEach(item => {
         const [k, v] = item.split(':');
-        if (k && v !== undefined) data[k.trim()] = parseFloat(v.trim());
+        if (k && v !== undefined) {
+          const num = parseFloat(v.trim());
+          if (!isNaN(num)) data[k.trim()] = num;
+        }
       });
 
-      // 1. VRM
-      if (!isNaN(data.VRM)) {
+      // 1. Валидация и отрисовка VRM
+      if (data.VRM !== undefined) {
         const vrmEl = document.getElementById('val-vrm');
         const vrmStatus = document.getElementById('vrm-status-text');
         if (data.VRM === -127.0) {
           vrmEl.textContent = 'ОШИБ';
           vrmStatus.textContent = 'Обрыв датчика';
           vrmStatus.style.color = 'var(--accent-red)';
-        } else {
+        } else if (data.VRM >= 0 && data.VRM <= 125) {
           vrmEl.textContent = data.VRM.toFixed(1);
           if (data.VRM > 85) {
             vrmStatus.textContent = 'Критический нагрев';
@@ -651,15 +649,15 @@
         }
       }
 
-      // 2. Корпус
-      if (!isNaN(data.AUX)) {
+      // 2. Валидация и отрисовка Корпуса
+      if (data.AUX !== undefined) {
         const caseEl = document.getElementById('val-case');
         const caseStatus = document.getElementById('case-status-text');
         if (data.AUX <= -90.0) {
           caseEl.textContent = 'ОТКЛ';
           caseStatus.textContent = 'Не подключен';
           caseStatus.style.color = 'var(--text-muted)';
-        } else {
+        } else if (data.AUX >= -10 && data.AUX <= 90) {
           caseEl.textContent = data.AUX.toFixed(1);
           if (data.AUX > 42) {
             caseStatus.textContent = 'Горячий корпус';
@@ -674,15 +672,15 @@
         }
       }
 
-      // 3. Кулер VRM
-      if (!isNaN(data.VRMFAN)) {
+      // 3. Валидация кулера VRM (0..100%)
+      if (data.VRMFAN !== undefined && data.VRMFAN >= 0 && data.VRMFAN <= 100) {
         const fanPct = Math.round(data.VRMFAN);
         document.getElementById('val-fan-vrm').textContent = fanPct + '%';
         document.getElementById('bar-fan-vrm').style.width = fanPct + '%';
       }
 
-      // 4. Порог старта
-      if (!isNaN(data.START_TEMP)) {
+      // 4. Порог старта от Arduino (25..85°C)
+      if (data.START_TEMP !== undefined && data.START_TEMP >= 25 && data.START_TEMP <= 85) {
         const inputStart = document.getElementById('input-vrm-start');
         if (document.activeElement !== inputStart) {
           inputStart.value = Math.round(data.START_TEMP);
@@ -704,7 +702,7 @@
         try {
           await serialWriter.write(cmd + '\n');
         } catch (e) {
-          console.error('[Serial] Ошибка отправки:', e);
+          console.error('[Serial] Ошибка отправки команды:', e);
         }
       }
     }
@@ -730,12 +728,12 @@
 
     function applyVrmAuto() {
       const val = parseFloat(document.getElementById('input-vrm-start').value);
-      if (!isNaN(val)) sendSerial(`AUTO:${val}`);
+      if (!isNaN(val) && val >= 25 && val <= 85) sendSerial(`AUTO:${val}`);
     }
 
     function applyVrmManual() {
       const val = parseInt(document.getElementById('input-vrm-val').value, 10);
-      if (!isNaN(val)) sendSerial(`MANUAL:${val}`);
+      if (!isNaN(val) && val >= 0 && val <= 100) sendSerial(`MANUAL:${val}`);
     }
 
     function switchCaseMode(mode) {
@@ -759,12 +757,12 @@
 
     function applyCaseAuto() {
       const val = parseFloat(document.getElementById('input-case-start').value);
-      if (!isNaN(val)) sendSerial(`CASE_AUTO:${val}`);
+      if (!isNaN(val) && val >= 20 && val <= 60) sendSerial(`CASE_AUTO:${val}`);
     }
 
     function applyCaseManual() {
       const val = parseInt(document.getElementById('input-case-val').value, 10);
-      if (!isNaN(val)) {
+      if (!isNaN(val) && val >= 0 && val <= 100) {
         document.getElementById('val-fan-case').textContent = val + '%';
         document.getElementById('bar-fan-case').style.width = val + '%';
         sendSerial(`CASE_MANUAL:${val}`);
@@ -795,7 +793,6 @@
             document.getElementById('val-cpu-temp').textContent = Math.round(data.cpu.packageTemp);
           }
 
-          // Значение кулера CPU рядом с температурой (шрифт 21px)
           const cpuFanEl = document.getElementById('val-cpu-fan-inline');
           const cpuFanUnitEl = document.getElementById('unit-cpu-fan-inline');
           if (data.cpu.fanSpeed !== null && data.cpu.fanSpeed !== undefined) {
@@ -806,7 +803,6 @@
             cpuFanUnitEl.textContent = '';
           }
 
-          // Полоса состояния CPU
           if (data.cpu.totalLoad !== null) {
             document.getElementById('bar-cpu-total-load').style.width = Math.round(data.cpu.totalLoad) + '%';
           }
@@ -821,7 +817,7 @@
             document.getElementById('val-cpu-clock').textContent = Math.round(data.cpu.clocks[0].value) + ' MHz';
           }
 
-          // Отрисовка ЧАСТОТ ЯДЕР: строго одна строка, только ГГц, без названий и полос
+          // Отрисовка частот ядер: строго одна строка, только ГГц
           if (data.cpu.coreClocks && data.cpu.coreClocks.length > 0) {
             const coresContainer = document.getElementById('cpu-cores-list');
             if (coresContainer.children.length !== data.cpu.coreClocks.length) {
@@ -851,7 +847,6 @@
             document.getElementById('val-gpu-temp').textContent = Math.round(data.gpu.coreTemp);
           }
 
-          // Значение кулера GPU рядом с температурой (шрифт 21px)
           const gpuFanEl = document.getElementById('val-gpu-fan-inline');
           const gpuFanUnitEl = document.getElementById('unit-gpu-fan-inline');
           if (data.gpu.fanPercent !== null && data.gpu.fanPercent !== undefined) {
@@ -862,12 +857,10 @@
             gpuFanUnitEl.textContent = '';
           }
 
-          // Полоса состояния GPU
           if (data.gpu.load !== null) {
             document.getElementById('bar-gpu-load').style.width = Math.round(data.gpu.load) + '%';
           }
 
-          // Hot Spot
           const hotspotEl = document.getElementById('val-gpu-hotspot');
           if (data.gpu.hotspotTemp !== null && data.gpu.hotspotTemp !== undefined) {
             const hs = Math.round(data.gpu.hotspotTemp);
@@ -885,12 +878,11 @@
 
         // --- Блок NVMe ---
         if (data.nvme) {
-          if (data.nvme.disks && data.nvme.disks.length > 0) {
-            const disk = data.nvme.disks[0];
-            document.getElementById('nvme-drive-name').textContent = disk.name;
-            if (disk.temp !== null && disk.temp !== undefined) {
-              document.getElementById('val-nvme-temp').textContent = Math.round(disk.temp);
-            }
+          if (data.nvme.name) {
+            document.getElementById('nvme-drive-name').textContent = data.nvme.name;
+          }
+          if (data.nvme.temp !== null && data.nvme.temp !== undefined) {
+            document.getElementById('val-nvme-temp').textContent = Math.round(data.nvme.temp);
           }
           if (data.nvme.primaryFs) {
             const fs = data.nvme.primaryFs;
