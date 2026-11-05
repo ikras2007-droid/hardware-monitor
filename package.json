@@ -1,0 +1,30 @@
+{
+  "name": "hardware-monitor",
+  "version": "1.0.0",
+  "description": "Автономный монитор VRM и CPU",
+  "main": "main.js",
+  "scripts": {
+    "start": "electron .",
+    "build": "electron-builder --win --x64"
+  },
+  "build": {
+    "appId": "com.vrm.monitor",
+    "win": {
+      "target": "portable",
+      "requestedExecutionLevel": "requireAdministrator"
+    },
+    "extraResources": [
+      {
+        "from": "bin",
+        "to": "bin"
+      }
+    ]
+  },
+  "dependencies": {
+    "systeminformation": "^5.23.0"
+  },
+  "devDependencies": {
+    "electron": "^33.0.0",
+    "electron-builder": "^25.0.0"
+  }
+}
